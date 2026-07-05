@@ -2,7 +2,7 @@
 
 Google Apps Script automation that classifies unread Gmail emails with OpenAI and applies Gmail labels automatically.
 
-This portfolio demo is designed for small business inbox workflows where incoming emails need to be sorted into clear operational categories such as invoices, orders, complaints, quote requests, marketing, internal communication, and other.
+This portfolio project is designed for small business inbox workflows where incoming emails need to be sorted into clear operational categories such as invoices, orders, complaints, quote requests, marketing, internal communication, and other.
 
 ## What It Does
 
@@ -26,20 +26,17 @@ This portfolio demo is designed for small business inbox workflows where incomin
 
 ## Project Structure
 
-```text
 ai-gmail-classifier-apps-script/
-  src/
-    Code.gs
-  docs/
-    portfolio-case-study.md
-    upwork-portfolio-copy.md
-  README.md
+  Code.gs
   appsscript.json
-```
+  README.md
+  portfolio-case-study.md
+  AI-Gmail-Classifier-Case-Study.pdf
+  AI-Gmail-Classifier-Technical-Summary.pdf
 
 ## Configuration
 
-Categories are stored at the top of `src/Code.gs`:
+Categories are stored at the top of Code.gs:
 
 ```javascript
 CATEGORIES: [
@@ -96,4 +93,8 @@ OPENAI_API_KEY = your_openai_api_key
 
 ## Portfolio Context
 
-This is a portfolio demo, not a live client deployment. It uses realistic production patterns such as script properties, batching, error handling, labels, and setup documentation so it can be adapted quickly for a real Gmail automation project.
+Portfolio Context
+
+This is a portfolio case study built to show how Gmail, Google Apps Script, OpenAI, and Google Sheets can work together in a practical business inbox automation workflow. It uses realistic production patterns such as Script Properties, batching, error handling, Gmail labels, processed-email tracking, and setup documentation, so it can be adapted quickly for a real client project.
+
+Improve README wording and project structure
