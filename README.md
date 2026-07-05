@@ -34,6 +34,7 @@ ai-gmail-classifier-apps-script/
   portfolio-case-study.md
   AI-Gmail-Classifier-Case-Study.pdf
   AI-Gmail-Classifier-Technical-Summary.pdf
+```
 
 ## Configuration 
 
