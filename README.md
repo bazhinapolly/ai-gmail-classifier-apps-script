@@ -26,6 +26,7 @@ This portfolio project is designed for small business inbox workflows where inco
 
 ## Project Structure
 
+```text
 ai-gmail-classifier-apps-script/
   Code.gs
   appsscript.json
@@ -34,7 +35,7 @@ ai-gmail-classifier-apps-script/
   AI-Gmail-Classifier-Case-Study.pdf
   AI-Gmail-Classifier-Technical-Summary.pdf
 
-## Configuration
+## Configuration 
 
 Categories are stored at the top of Code.gs:
 
@@ -55,7 +56,7 @@ A client can add, rename, or remove categories without changing the main workflo
 ## Setup Steps
 
 1. Create a new Google Apps Script project.
-2. Copy the contents of `src/Code.gs` into the script editor.
+2. Copy the contents of Code.gs into the script editor.
 3. Open `Project Settings`.
 4. Add a Script Property:
 
@@ -93,8 +94,4 @@ OPENAI_API_KEY = your_openai_api_key
 
 ## Portfolio Context
 
-Portfolio Context
-
 This is a portfolio case study built to show how Gmail, Google Apps Script, OpenAI, and Google Sheets can work together in a practical business inbox automation workflow. It uses realistic production patterns such as Script Properties, batching, error handling, Gmail labels, processed-email tracking, and setup documentation, so it can be adapted quickly for a real client project.
-
-Improve README wording and project structure
