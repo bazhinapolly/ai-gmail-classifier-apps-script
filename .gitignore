@@ -1,4 +1,13 @@
 .DS_Store
-.env
-*.log
 node_modules/
+coverage/
+*.log
+
+.env
+.env.*
+!.env.example
+
+.clasp.json
+.clasprc.json
+client_secret*.json
+credentials*.json

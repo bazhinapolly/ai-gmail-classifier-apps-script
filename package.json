@@ -1,0 +1,15 @@
+{
+  "name": "ai-gmail-classifier-apps-script",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Privacy-aware Gmail message classifier for Google Apps Script and OpenAI.",
+  "scripts": {
+    "check": "node scripts/check.mjs && node --test",
+    "test": "node --test",
+    "clasp:status": "npx @google/clasp show-file-status",
+    "clasp:push": "npx @google/clasp push"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
