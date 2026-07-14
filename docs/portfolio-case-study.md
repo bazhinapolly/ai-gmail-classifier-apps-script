@@ -43,9 +43,10 @@ parsing, refusals, incomplete responses, retry classification, and spreadsheet
 formula safety. GitHub Actions runs the same suite across supported Node.js
 versions.
 
-## Deployment boundary
+## Deployment readiness
 
-This repository is a production-oriented reference implementation, not a hosted
-service. A real deployment still requires organizational approval for sending
-email-derived data to an external AI provider, a restricted API project key,
-budget controls, representative evaluation data, and a dedicated smoke test.
+This production-oriented portfolio project is designed for installation in a
+dedicated Google Apps Script environment. Rollout includes organizational
+approval for sending selected email-derived data to an AI provider, a restricted
+API project key, budget controls, representative evaluation data, and a dedicated
+smoke test.

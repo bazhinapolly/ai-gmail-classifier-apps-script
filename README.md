@@ -95,8 +95,8 @@ shared-inbox architecture.
    configuration, creates managed labels and the error-log spreadsheet, and
    installs exactly one five-minute trigger.
 
-5. Run `testClassifierWithSampleEmail()` to make one paid request using only
-   fictional data. Then send a test message to the account and run
+5. Run `testClassifierWithSampleEmail()` to make one paid request using controlled
+   test data. Then send a test message to the account and run
    `classifyUnreadEmails()` manually.
 
 ## Manual Apps Script installation
@@ -158,6 +158,19 @@ same command on Node.js 20, 22, and 24.
 
 For a real integration test, use a dedicated Gmail test account and follow the
 [smoke-test checklist](docs/privacy-and-operations.md#deployment-smoke-test).
+
+## Portfolio documents
+
+- [Case Study](output/pdf/AI-Gmail-Classifier-Case-Study.pdf)
+- [Technical Summary](output/pdf/AI-Gmail-Classifier-Technical-Summary.pdf)
+
+Rebuild and validate both documents with:
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 tools/build_portfolio_pdfs.py
+python3 tools/check_portfolio_pdfs.py
+```
 
 ## Uninstall
 
