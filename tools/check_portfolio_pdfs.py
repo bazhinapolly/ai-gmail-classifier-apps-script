@@ -8,7 +8,7 @@ from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = {
-    "AI-Gmail-Classifier-Case-Study.pdf": (2, ("Privacy-Aware AI Gmail", "18 deterministic tests", "Business value")),
+    "AI-Gmail-Classifier-Case-Study.pdf": (2, ("Privacy-Aware AI Gmail", "22 deterministic tests", "Business value")),
     "AI-Gmail-Classifier-Technical-Summary.pdf": (1, ("AI Gmail Message Classifier", "Structured Outputs", "Production rollout")),
 }
 FORBIDDEN = (r"\bdemo\b", r"\beducational\b", r"\blearning project\b", r"reference app", r"reference implementation", r"not a live")

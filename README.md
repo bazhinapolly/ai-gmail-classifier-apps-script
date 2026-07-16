@@ -21,6 +21,7 @@ that thread was already processed.
 - Retries transient provider failures with bounded exponential backoff
 - Sends permanent per-message failures to `AI/Needs Review`
 - Writes metadata-only, formula-safe error records to Google Sheets
+- Automatically removes error records after a configurable retention period
 - Includes deterministic local tests and GitHub Actions CI
 
 ## Data flow
@@ -50,7 +51,7 @@ before using real business email.
 - A Google account with Gmail and Apps Script access
 - An OpenAI API project key with an appropriate budget limit
 - Node.js 20 or newer for local checks
-- Optional: [`clasp`](https://github.com/google/clasp) for deployment
+- The repository-pinned [`clasp`](https://github.com/google/clasp) development dependency for deployment
 
 This design supports one Gmail account per copy of the Apps Script project.
 Installable triggers run as the user who creates them. It is not a delegated or
@@ -71,7 +72,8 @@ shared-inbox architecture.
    `.clasp.json`, and authenticate:
 
    ```bash
-   npx @google/clasp login
+   npm ci
+   npm run clasp:login
    npm run clasp:status
    npm run clasp:push
    ```
@@ -133,6 +135,7 @@ does not modify unrelated Gmail labels or the unread state.
 - `testClassifierWithSampleEmail()` — fictional-data API smoke test
 - `createFiveMinuteTrigger()` — idempotently ensure one trigger
 - `deleteClassifierTriggers()` — disable scheduled processing
+- `pruneErrorLog()` — immediately apply the configured log-retention policy
 
 ## Configuration
 
@@ -141,6 +144,8 @@ threshold, labels, or time budget. `validateConfig_()` rejects duplicate IDs,
 duplicate labels, invalid thresholds, a missing fallback, and non-namespaced
 managed labels before processing begins.
 
+Error-log rows are retained for 90 days by default and pruned automatically during setup and before new error records are appended. Set `ERROR_LOG_RETENTION_DAYS` in Script Properties to an integer from 1 to 3650 to match the mailbox owner's approved policy.
+
 The default pinned model is `gpt-4o-mini-2024-07-18`, a small model that supports
 intent classification, the Responses API, and Structured Outputs. Evaluate a
 model change against representative, non-sensitive examples before deployment.
@@ -148,13 +153,19 @@ model change against representative, non-sensitive examples before deployment.
 ## Verification
 
 ```bash
-npm install
+npm ci
 npm run check
 ```
 
-The check command validates Apps Script syntax, validates the manifest and exact
-OAuth allowlist, checks repository hygiene, and runs unit tests. CI runs the
-same command on Node.js 20, 22, and 24.
+The check command validates Apps Script syntax, the manifest and exact OAuth
+allowlist, the synthetic evaluation dataset, repository hygiene, unit tests,
+and end-to-end orchestration behavior with Apps Script service stubs. CI runs
+the same command on Node.js 20, 22, and 24.
+
+The versioned evaluation harness covers all categories and prompt-injection
+cases and can produce confusion-matrix, precision, and recall metrics for an
+explicit model. See [classification evaluation](docs/evaluation.md). No live
+quality score is claimed until the paid evaluation is run and reviewed.
 
 For a real integration test, use a dedicated Gmail test account and follow the
 [smoke-test checklist](docs/privacy-and-operations.md#deployment-smoke-test).
@@ -178,7 +189,7 @@ python3 tools/check_portfolio_pdfs.py
 2. Delete the `AI/...` labels if they are no longer needed.
 3. Delete the generated error-log spreadsheet.
 4. Delete `OPENAI_API_KEY`, `OPENAI_MODEL`, and
-   `ERROR_LOG_SPREADSHEET_ID` from Script Properties.
+   `ERROR_LOG_SPREADSHEET_ID` and `ERROR_LOG_RETENTION_DAYS` from Script Properties.
 5. Revoke the script's Google account access if the project will not be reused.
 6. Rotate or delete the OpenAI project key.
 

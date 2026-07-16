@@ -4,10 +4,18 @@
   "private": true,
   "description": "Privacy-aware Gmail message classifier for Google Apps Script and OpenAI.",
   "scripts": {
-    "check": "node scripts/check.mjs && node --test",
+    "check": "node scripts/check.mjs && node scripts/evaluate.mjs --validate && node --test",
     "test": "node --test",
-    "clasp:status": "npx @google/clasp show-file-status",
-    "clasp:push": "npx @google/clasp push"
+    "eval:openai": "node scripts/evaluate.mjs",
+    "clasp:login": "clasp login",
+    "clasp:status": "clasp show-file-status",
+    "clasp:push": "clasp push"
+  },
+  "devDependencies": {
+    "@google/clasp": "3.3.0"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   },
   "engines": {
     "node": ">=20"

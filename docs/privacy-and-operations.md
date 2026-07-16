@@ -53,6 +53,10 @@ different architecture and explicit testing.
 
 Error sheets contain message IDs and diagnostic metadata, not email content.
 Gmail message IDs are still operational metadata and should be access-controlled.
+Rows older than `ERROR_LOG_RETENTION_DAYS` are removed automatically during
+setup and before a new error is logged. The default is 90 days. The mailbox
+owner is responsible for selecting an approved period, restricting sheet
+access, reviewing the deletion behavior, and applying any legal hold policy.
 
 ## Deployment smoke test
 
@@ -73,6 +77,8 @@ Use a dedicated Gmail test account and non-sensitive fictional messages.
     without subject, sender, body, API key, or raw provider response.
 11. Restore configuration and inspect Apps Script execution logs and OpenAI
     usage before enabling scheduled processing.
+12. Set a short test retention period, add an expired fictional row, run
+    `pruneErrorLog()`, and confirm only expired data rows are deleted.
 
 ## Monitoring
 

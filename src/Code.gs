@@ -21,6 +21,8 @@ const CONFIG = {
   NEEDS_REVIEW_LABEL: "AI/Needs Review",
   ERROR_LOG_SHEET_NAME: "Classifier Errors",
   ERROR_LOG_SPREADSHEET_PROPERTY: "ERROR_LOG_SPREADSHEET_ID",
+  ERROR_LOG_RETENTION_PROPERTY: "ERROR_LOG_RETENTION_DAYS",
+  ERROR_LOG_RETENTION_DAYS_DEFAULT: 90,
   CATEGORIES: [
     {
       id: "invoice",
@@ -143,12 +145,15 @@ function setupClassifier() {
     validateConfig_(true);
     const labels = ensureManagedLabels_();
     const sheet = getErrorLogSheet_();
+    const deletedErrorRows = pruneErrorLogSheet_(sheet, new Date());
     const trigger = ensureClassifierTrigger_();
     const result = {
       status: "ready",
       model: getConfiguredModel_(),
       managedLabelCount: Object.keys(labels.byName).length,
       errorLogUrl: sheet.getParent().getUrl(),
+      errorLogRetentionDays: getErrorLogRetentionDays_(),
+      deletedExpiredErrorRows: deletedErrorRows,
       triggerId: trigger.getUniqueId()
     };
     console.log(JSON.stringify(result));
@@ -172,6 +177,13 @@ function deleteClassifierTriggers() {
   });
 }
 
+/** Deletes error-log rows older than the configured retention period. */
+function pruneErrorLog() {
+  return withScriptLock_(function() {
+    return pruneErrorLogSheet_(getErrorLogSheet_(), new Date());
+  });
+}
+
 /** Read-only configuration status. Never returns the API key. */
 function getClassifierStatus() {
   validateConfig_(false);
@@ -182,7 +194,8 @@ function getClassifierStatus() {
     triggerCount: getClassifierTriggers_().length,
     errorLogConfigured: Boolean(
       properties.getProperty(CONFIG.ERROR_LOG_SPREADSHEET_PROPERTY)
-    )
+    ),
+    errorLogRetentionDays: getErrorLogRetentionDays_()
   };
 }
 
@@ -647,6 +660,7 @@ function validateConfig_(requireApiKey) {
   if (fallbackCount !== 1) {
     throw new Error("Exactly one category must use id other.");
   }
+  getErrorLogRetentionDays_();
   if (requireApiKey) getOpenAIKey_();
   return true;
 }
@@ -695,7 +709,9 @@ function logErrorSafely_(messageId, error) {
   ];
 
   try {
-    getErrorLogSheet_().appendRow(record);
+    const sheet = getErrorLogSheet_();
+    pruneErrorLogSheet_(sheet, new Date());
+    sheet.appendRow(record);
   } catch (loggingError) {
     console.error(
       "Classifier error " +
@@ -738,6 +754,41 @@ function getErrorLogSheet_() {
     ]);
   }
   return sheet;
+}
+
+function getErrorLogRetentionDays_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(
+    CONFIG.ERROR_LOG_RETENTION_PROPERTY
+  );
+  if (!raw) {
+    return CONFIG.ERROR_LOG_RETENTION_DAYS_DEFAULT;
+  }
+  const days = Number(raw);
+  if (!Number.isInteger(days) || days < 1 || days > 3650) {
+    throw new Error("ERROR_LOG_RETENTION_DAYS must be an integer from 1 to 3650.");
+  }
+  return days;
+}
+
+function pruneErrorLogSheet_(sheet, now) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return 0;
+  }
+
+  const cutoff = now.getTime() - getErrorLogRetentionDays_() * 24 * 60 * 60 * 1000;
+  const timestamps = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  let deleted = 0;
+
+  for (let index = timestamps.length - 1; index >= 0; index -= 1) {
+    const value = timestamps[index][0];
+    const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
+    if (Number.isFinite(timestamp) && timestamp < cutoff) {
+      sheet.deleteRow(index + 2);
+      deleted += 1;
+    }
+  }
+  return deleted;
 }
 
 function createProviderError_(

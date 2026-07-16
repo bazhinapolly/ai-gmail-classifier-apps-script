@@ -7,6 +7,7 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.pdfgen.canvas import Canvas
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,10 +63,15 @@ def document(path, title):
     return SimpleDocTemplate(str(path), pagesize=LETTER, title=title, author="Polina Bazhina", leftMargin=0.62 * inch, rightMargin=0.62 * inch, topMargin=0.5 * inch, bottomMargin=0.62 * inch)
 
 
+def invariant_canvas(*args, **kwargs):
+    kwargs["invariant"] = 1
+    return Canvas(*args, **kwargs)
+
+
 def strip():
     data = [
         [p("PLATFORM", "small"), p("AI CONTRACT", "small"), p("PRIVACY", "small"), p("QUALITY", "small")],
-        [p("Google Apps Script", "h3"), p("Strict Structured Outputs", "h3"), p("Minimized and redacted input", "h3"), p("18 tests + multi-version CI", "h3")],
+        [p("Google Apps Script", "h3"), p("Strict Structured Outputs", "h3"), p("Minimized and redacted input", "h3"), p("22 tests + multi-version CI", "h3")],
     ]
     return Table(data, colWidths=[1.675 * inch] * 4, style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), PALE_CYAN), ("BOX", (0, 0), (-1, -1), 0.7, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("PADDING", (0, 0), (-1, -1), 7)]))
 
@@ -100,14 +106,15 @@ def build_case_study():
         bullet("AI/Needs Review creates a visible queue for permanent message-level failures."),
         bullet("Safe status helpers expose configuration readiness without returning secrets."),
         bullet("Client and provider request IDs support correlation without logging message content."),
+        bullet("Configurable 90-day default retention automatically removes expired error rows."),
         p("Verification evidence", "h2"),
-        p("18 deterministic tests cover minimized input, PII redaction, strict output validation, confidence fallback, refusal and incomplete responses, retry classification, atomic label updates, and spreadsheet formula safety. GitHub Actions repeats syntax, manifest, hygiene, and test checks on Node.js 20, 22, and 24."),
+        p("22 deterministic tests cover minimized input, PII redaction, strict output validation, full message orchestration, repeat runs, fatal recovery, idempotent setup, retention, label updates, and spreadsheet safety. CI also validates a category-balanced evaluation set with prompt-injection cases on Node.js 20, 22, and 24."),
         p("Deployment path", "h2"),
         p("Install with clasp or the Apps Script editor, add a restricted OpenAI project key in Script Properties, review the manifest scopes, run idempotent setup, execute the controlled smoke test, and validate with a dedicated Gmail account before enabling the five-minute trigger."),
         p("Business value", "h2"),
         p("The workflow reduces repetitive inbox triage, keeps ambiguous cases visible, preserves the user's normal email state, and provides a controlled foundation for account-specific categories and policies."),
     ]
-    document(OUT / "AI-Gmail-Classifier-Case-Study.pdf", "AI Gmail Classifier - Case Study").build(story, onFirstPage=frame, onLaterPages=frame)
+    document(OUT / "AI-Gmail-Classifier-Case-Study.pdf", "AI Gmail Classifier - Case Study").build(story, onFirstPage=frame, onLaterPages=frame, canvasmaker=invariant_canvas)
 
 
 def build_technical():
@@ -132,13 +139,13 @@ def build_technical():
         p("Safety controls", "h2"),
         Table([[[bullet("Untrusted email delimiters and prompt instructions"), bullet("Strict local schema and finite confidence"), bullet("No secret-bearing status output"), bullet("Explicit OAuth scope allowlist")], [bullet("Lock and runtime deadline"), bullet("Bounded retry and Retry-After support"), bullet("Formula-safe spreadsheet values"), bullet("Content-free operational logging")]]], colWidths=[3.35 * inch] * 2, style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), PALE), ("BOX", (0, 0), (-1, -1), 0.7, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 8)])),
         p("Verification", "h2"),
-        p("18 tests plus repository checks run on Node.js 20, 22, and 24. A dedicated Apps Script smoke-test function exercises one controlled provider request before trigger activation."),
+        p("22 tests plus repository and evaluation-fixture checks run on Node.js 20, 22, and 24. A dedicated Apps Script smoke-test function exercises one controlled provider request before trigger activation."),
         p("Run locally", "h2"),
         Table([[p("npm install", "code"), p("npm run check", "code"), p("npm run clasp:status", "code")]], colWidths=[2.1 * inch, 2.2 * inch, 2.4 * inch], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), NAVY), ("BOX", (0, 0), (-1, -1), 0.7, NAVY), ("PADDING", (0, 0), (-1, -1), 8)])),
         Spacer(1, 0.05 * inch),
         p("Production rollout includes scope approval, restricted credentials, provider budget controls, representative evaluation, and a dedicated Gmail smoke test.", "small"),
     ]
-    document(OUT / "AI-Gmail-Classifier-Technical-Summary.pdf", "AI Gmail Classifier - Technical Summary").build(story, onFirstPage=frame, onLaterPages=frame)
+    document(OUT / "AI-Gmail-Classifier-Technical-Summary.pdf", "AI Gmail Classifier - Technical Summary").build(story, onFirstPage=frame, onLaterPages=frame, canvasmaker=invariant_canvas)
 
 
 def main():

@@ -239,3 +239,119 @@ test("retry delay uses exponential fallback when Retry-After is absent", () => {
   script.call('sleepBeforeRetry_(2, {"Retry-After":"3"})');
   assert.deepEqual(sleeps, [2000, 3000]);
 });
+
+function createManagedLabels() {
+  const names = [
+    "AI/Processed", "AI/Needs Review", "AI/Invoice", "AI/Order",
+    "AI/Complaint", "AI/Quote Request", "AI/Marketing", "AI/Internal", "AI/Other"
+  ];
+  return names.map((name, index) => ({ id: `label-${index}`, name }));
+}
+
+test("classifyUnreadEmails orchestrates one message and is safe to repeat", () => {
+  const labels = createManagedLabels();
+  const processedId = labels.find((item) => item.name === "AI/Processed").id;
+  const message = {
+    id: "message-1", labelIds: [], snippet: "Invoice attached",
+    payload: { headers: [
+      { name: "From", value: "Billing <billing@example.com>" },
+      { name: "Subject", value: "June invoice" }
+    ] }
+  };
+  let released = 0;
+  let modifications = 0;
+  const properties = { OPENAI_API_KEY: "test-key", OPENAI_MODEL: "test-model" };
+  const script = loadScript({
+    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => { released += 1; } }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || null }) },
+    Gmail: { Users: {
+      Labels: { list: () => ({ labels }), create: () => { throw new Error("unexpected label creation"); } },
+      Messages: {
+        list: () => ({ messages: [{ id: message.id }] }), get: () => message,
+        modify(resource) {
+          modifications += 1;
+          message.labelIds = message.labelIds.filter((id) => !resource.removeLabelIds.includes(id))
+            .concat(resource.addLabelIds.filter((id) => !message.labelIds.includes(id)));
+        }
+      }
+    } }
+  });
+  script.call('classifyEmailWithOpenAI_=function(){return {categoryId:"invoice",confidence:0.98,reason:"Invoice"};}');
+  const first = script.call("classifyUnreadEmails()");
+  const second = script.call("classifyUnreadEmails()");
+  assert.equal(first.processed, 1);
+  assert.equal(second.skipped, 1);
+  assert.equal(modifications, 1);
+  assert.equal(message.labelIds.includes(processedId), true);
+  assert.equal(released, 2);
+});
+
+test("classifyUnreadEmails stops the batch after a fatal provider error", () => {
+  const labels = createManagedLabels();
+  let messageReads = 0;
+  const script = loadScript({
+    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() {} }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => key === "OPENAI_API_KEY" ? "key" : null }) },
+    Gmail: { Users: {
+      Labels: { list: () => ({ labels }) },
+      Messages: {
+        list: () => ({ messages: [{ id: "one" }, { id: "two" }] }),
+        get(id) { messageReads += 1; return { id, labelIds: [], payload: { headers: [] }, snippet: "x" }; },
+        modify() {}
+      }
+    } }
+  });
+  script.call('logErrorSafely_=function(){}');
+  script.call('classifyEmailWithOpenAI_=function(){var error=new Error("safe");error.fatal=true;throw error;}');
+  const summary = script.call("classifyUnreadEmails()");
+  assert.equal(summary.errors, 1);
+  assert.equal(summary.stoppedEarly, true);
+  assert.equal(messageReads, 1);
+});
+
+test("setupClassifier is idempotent across labels, sheet, and trigger", () => {
+  const labels = [];
+  const triggers = [];
+  const properties = { OPENAI_API_KEY: "key" };
+  const sheet = {
+    rows: [], appendRow(row) { this.rows.push(row); }, getLastRow() { return this.rows.length; },
+    getRange() { return { getValues: () => [] }; }, deleteRow() {},
+    getParent: () => ({ getUrl: () => "https://example.invalid/sheet" })
+  };
+  const spreadsheet = { getId: () => "sheet-id", getUrl: () => "https://example.invalid/sheet", getSheetByName: () => sheet, insertSheet: () => sheet };
+  let createdSpreadsheets = 0;
+  const script = loadScript({
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || null, setProperty: (key, value) => { properties[key] = value; } }) },
+    Gmail: { Users: { Labels: {
+      list: () => ({ labels }),
+      create(value) { const label = { id: `id-${labels.length}`, name: value.name }; labels.push(label); return label; }
+    } } },
+    SpreadsheetApp: { create() { createdSpreadsheets += 1; return spreadsheet; }, openById: () => spreadsheet },
+    ScriptApp: {
+      getProjectTriggers: () => triggers, deleteTrigger() {},
+      newTrigger: () => ({ timeBased: () => ({ everyMinutes: () => ({ create() {
+        const trigger = { getHandlerFunction: () => "classifyUnreadEmails", getUniqueId: () => "trigger-1" };
+        triggers.push(trigger); return trigger;
+      } }) }) })
+    }
+  });
+  const first = script.call("setupClassifier()");
+  const second = script.call("setupClassifier()");
+  assert.equal(first.status, "ready");
+  assert.equal(second.triggerId, "trigger-1");
+  assert.equal(labels.length, 9);
+  assert.equal(triggers.length, 1);
+  assert.equal(createdSpreadsheets, 1);
+});
+
+test("error-log retention removes only expired data rows", () => {
+  const removed = [];
+  const values = [[new Date("2026-01-01T00:00:00Z")], [new Date("2026-06-15T00:00:00Z")], ["not-a-date"]];
+  const script = loadScript({ PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => key === "ERROR_LOG_RETENTION_DAYS" ? "90" : null }) } });
+  const sheet = { getLastRow: () => 4, getRange: () => ({ getValues: () => values }), deleteRow: (row) => removed.push(row) };
+  const context = vm.createContext({ sheet, now: new Date("2026-07-17T00:00:00Z") });
+  context.prune = script.call("pruneErrorLogSheet_");
+  assert.equal(context.prune(sheet, context.now), 1);
+  assert.deepEqual(removed, [2]);
+});
