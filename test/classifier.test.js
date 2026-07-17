@@ -355,3 +355,58 @@ test("error-log retention removes only expired data rows", () => {
   assert.equal(context.prune(sheet, context.now), 1);
   assert.deepEqual(removed, [2]);
 });
+
+test("validateConfig_ rejects invalid managed labels and runtime controls", () => {
+  const cases = [
+    ['CONFIG.PROCESSED_LABEL="Processed"', /managed label must start with AI/],
+    ['CONFIG.NEEDS_REVIEW_LABEL=CONFIG.PROCESSED_LABEL', /Managed labels must be unique/],
+    ['CONFIG.PROCESSED_LABEL=CONFIG.CATEGORIES[0].label', /Managed labels must be unique/],
+    ['CONFIG.OPENAI_MAX_ATTEMPTS=0', /OPENAI_MAX_ATTEMPTS/],
+    ['CONFIG.OPENAI_TIMEOUT_SECONDS=301', /OPENAI_TIMEOUT_SECONDS/],
+    ['CONFIG.MAX_RUN_MS=999', /MAX_RUN_MS/]
+  ];
+  for (const [mutation, expected] of cases) {
+    const script = loadScript({
+      Gmail: { Users: {} },
+      PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) }
+    });
+    script.call(mutation);
+    assert.throws(() => script.call("validateConfig_(false)"), expected);
+  }
+});
+
+test("getErrorLogSheet_ replaces an inaccessible stored spreadsheet", () => {
+  const properties = { ERROR_LOG_SPREADSHEET_ID: "deleted-sheet" };
+  const rows = [];
+  const warnings = [];
+  const sheet = {
+    appendRow: (row) => rows.push(row),
+    getParent: () => spreadsheet
+  };
+  const spreadsheet = {
+    getId: () => "replacement-sheet",
+    getSheetByName: () => sheet,
+    insertSheet: () => sheet
+  };
+  let created = 0;
+  const script = loadScript({
+    console: { log() {}, error() {}, warn: (message) => warnings.push(message) },
+    PropertiesService: { getScriptProperties: () => ({
+      getProperty: (key) => properties[key] || null,
+      setProperty: (key, value) => { properties[key] = value; },
+      deleteProperty: (key) => { delete properties[key]; }
+    }) },
+    SpreadsheetApp: {
+      openById: () => { throw new Error("not found"); },
+      create: () => { created += 1; return spreadsheet; }
+    }
+  });
+
+  const result = script.call("getErrorLogSheet_()");
+  assert.equal(result, sheet);
+  assert.equal(created, 1);
+  assert.equal(properties.ERROR_LOG_SPREADSHEET_ID, "replacement-sheet");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0][2], "error_log_recreated");
+  assert.match(warnings[0], /creating a replacement/);
+});

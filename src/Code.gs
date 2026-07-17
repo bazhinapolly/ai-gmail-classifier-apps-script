@@ -631,6 +631,15 @@ function validateConfig_(requireApiKey) {
   if (!Number.isInteger(CONFIG.MAX_MESSAGES_PER_RUN) || CONFIG.MAX_MESSAGES_PER_RUN < 1) {
     throw new Error("MAX_MESSAGES_PER_RUN must be a positive integer.");
   }
+  if (!Number.isInteger(CONFIG.OPENAI_MAX_ATTEMPTS) || CONFIG.OPENAI_MAX_ATTEMPTS < 1 || CONFIG.OPENAI_MAX_ATTEMPTS > 10) {
+    throw new Error("OPENAI_MAX_ATTEMPTS must be an integer from 1 to 10.");
+  }
+  if (!Number.isInteger(CONFIG.OPENAI_TIMEOUT_SECONDS) || CONFIG.OPENAI_TIMEOUT_SECONDS < 1 || CONFIG.OPENAI_TIMEOUT_SECONDS > 300) {
+    throw new Error("OPENAI_TIMEOUT_SECONDS must be an integer from 1 to 300.");
+  }
+  if (!Number.isInteger(CONFIG.MAX_RUN_MS) || CONFIG.MAX_RUN_MS < 1000 || CONFIG.MAX_RUN_MS > 330000) {
+    throw new Error("MAX_RUN_MS must be an integer from 1000 to 330000.");
+  }
   if (
     typeof CONFIG.CONFIDENCE_THRESHOLD !== "number" ||
     CONFIG.CONFIDENCE_THRESHOLD < 0 ||
@@ -641,16 +650,28 @@ function validateConfig_(requireApiKey) {
 
   const ids = {};
   const labels = {};
+  [CONFIG.PROCESSED_LABEL, CONFIG.NEEDS_REVIEW_LABEL].forEach(function(label) {
+    if (!label || label.indexOf("AI/") !== 0) {
+      throw new Error("Every managed label must start with AI/.");
+    }
+    if (labels[label]) {
+      throw new Error("Managed labels must be unique.");
+    }
+    labels[label] = true;
+  });
   let fallbackCount = 0;
   CONFIG.CATEGORIES.forEach(function(category) {
     if (!category.id || !/^[a-z][a-z0-9_]*$/.test(category.id)) {
       throw new Error("Every category id must use lowercase letters, numbers, or underscores.");
     }
     if (!category.label || category.label.indexOf("AI/") !== 0) {
-      throw new Error("Every managed category label must start with AI/.");
+      throw new Error("Every managed label must start with AI/.");
     }
-    if (ids[category.id] || labels[category.label]) {
-      throw new Error("Category ids and labels must be unique.");
+    if (ids[category.id]) {
+      throw new Error("Category ids must be unique.");
+    }
+    if (labels[category.label]) {
+      throw new Error("Managed labels must be unique.");
     }
     ids[category.id] = true;
     labels[category.label] = true;
@@ -731,9 +752,18 @@ function getErrorLogSheet_() {
   );
   let spreadsheet;
 
+  let recovered = false;
   if (spreadsheetId) {
-    spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-  } else {
+    try {
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (error) {
+      console.warn("Stored error-log spreadsheet is unavailable; creating a replacement.");
+      properties.deleteProperty(CONFIG.ERROR_LOG_SPREADSHEET_PROPERTY);
+      spreadsheetId = "";
+      recovered = true;
+    }
+  }
+  if (!spreadsheet) {
     spreadsheet = SpreadsheetApp.create("AI Gmail Classifier Error Log");
     spreadsheetId = spreadsheet.getId();
     properties.setProperty(CONFIG.ERROR_LOG_SPREADSHEET_PROPERTY, spreadsheetId);
@@ -751,6 +781,18 @@ function getErrorLogSheet_() {
       "Client request ID",
       "Attempt",
       "Safe error message"
+    ]);
+  }
+  if (recovered) {
+    sheet.appendRow([
+      new Date(),
+      "",
+      "error_log_recreated",
+      "",
+      "",
+      "",
+      "",
+      "Stored error-log spreadsheet was unavailable; a replacement was created."
     ]);
   }
   return sheet;

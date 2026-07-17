@@ -169,6 +169,9 @@ quality score is claimed until the paid evaluation is run and reviewed.
 
 For a real integration test, use a dedicated Gmail test account and follow the
 [smoke-test checklist](docs/privacy-and-operations.md#deployment-smoke-test).
+Record the owner-run evidence in [integration verification](docs/integration-verification.md)
+without including message content, account identifiers, secrets, or claims of
+client deployment.
 
 ## Portfolio documents
 
