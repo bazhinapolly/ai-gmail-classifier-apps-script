@@ -170,6 +170,42 @@ test("parseOpenAIResponse_ handles refusal and incomplete responses", () => {
   );
 });
 
+test("parseOpenAIResponse_ fails closed for non-completed lifecycle states", () => {
+  const script = loadScript();
+  const output = [{
+    type: "message",
+    content: [{
+      type: "output_text",
+      text: JSON.stringify({
+        categoryId: "invoice",
+        confidence: 0.95,
+        reason: "Invoice terms."
+      })
+    }]
+  }];
+
+  for (const response of [
+    { output },
+    { status: "queued", output },
+    { status: "in_progress", output },
+    { status: "future_status", output }
+  ]) {
+    assert.throws(
+      () => script.call(`parseOpenAIResponse_(${JSON.stringify(JSON.stringify(response))})`),
+      /did not reach completed status/
+    );
+  }
+
+  assert.throws(
+    () => script.call(`parseOpenAIResponse_(${JSON.stringify(JSON.stringify({
+      status: "completed",
+      error: { code: "provider_failure" },
+      output
+    }))})`),
+    /error response/
+  );
+});
+
 test("OpenAI payload disables storage and constrains category ids", () => {
   const script = loadScript();
   const payload = script.call(

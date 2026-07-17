@@ -22,7 +22,7 @@ that thread was already processed.
 - Sends permanent per-message failures to `AI/Needs Review`
 - Writes metadata-only, formula-safe error records to Google Sheets
 - Automatically removes error records after a configurable retention period
-- Includes 30 deterministic tests, measured coverage gates, and GitHub Actions CI
+- Includes 31 deterministic tests, measured coverage gates, and GitHub Actions CI
 
 ## Data flow
 
@@ -162,7 +162,7 @@ allowlist, the synthetic evaluation dataset, repository hygiene, unit tests,
 and end-to-end orchestration behavior with Apps Script service stubs. CI runs
 the same command on Node.js 20, 22, and 24.
 
-The instrumented Apps Script source is required to maintain at least 90% statements, 85% branches, 90% functions, and 90% lines. The verified code commit `607039a9e53a051694e7348cdd33cc2419bb7773` reached 96.95% statements, 94.03% branches, 100% functions, and 96.89% lines on 2026-07-17.
+The instrumented Apps Script source is required to maintain at least 90% statements, 85% branches, 90% functions, and 90% lines. Release `v2.0.1` passed 31 deterministic tests and reached 96.97% statements, 94.07% branches, 100% functions, and 96.91% lines on 2026-07-17. The release includes a fail-closed provider lifecycle check: only `status: completed` responses without a provider error are parsed.
 
 The versioned evaluation harness covers all categories and prompt-injection
 cases and can produce confusion-matrix, precision, and recall metrics for an

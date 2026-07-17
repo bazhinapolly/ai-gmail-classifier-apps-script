@@ -71,7 +71,7 @@ def invariant_canvas(*args, **kwargs):
 def strip():
     data = [
         [p("PLATFORM", "small"), p("AI CONTRACT", "small"), p("PRIVACY", "small"), p("QUALITY", "small")],
-        [p("Google Apps Script", "h3"), p("Strict Structured Outputs", "h3"), p("Minimized and redacted input", "h3"), p("30 tests + 94% branches", "h3")],
+        [p("Google Apps Script", "h3"), p("Strict Structured Outputs", "h3"), p("Minimized and redacted input", "h3"), p("31 tests + 94% branches", "h3")],
     ]
     return Table(data, colWidths=[1.675 * inch] * 4, style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), PALE_CYAN), ("BOX", (0, 0), (-1, -1), 0.7, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("PADDING", (0, 0), (-1, -1), 7)]))
 
@@ -108,9 +108,9 @@ def build_case_study():
         bullet("Client and provider request IDs support correlation without logging message content."),
         bullet("Configurable 90-day default retention automatically removes expired error rows."),
         p("Verification evidence", "h2"),
-        p("30 deterministic tests cover minimized input, PII redaction, strict output validation, full message orchestration, retry and error branches, config invariants, idempotent setup, error-sheet recovery, retention, label updates, and spreadsheet safety. Instrumented coverage is 96.95% statements, 94.03% branches, 100% functions, and 96.89% lines."),
+        p("31 deterministic tests cover minimized input, PII redaction, strict output and provider-status validation, full message orchestration, retry and error branches, config invariants, idempotent setup, error-sheet recovery, retention, label updates, and spreadsheet safety. Instrumented coverage is 96.97% statements, 94.07% branches, 100% functions, and 96.91% lines."),
         p("Evidence status", "h2"),
-        p("Verified locally on 2026-07-17 at code commit 607039a9e53a051694e7348cdd33cc2419bb7773. Live Apps Script verification: pending. Portfolio verification only; no client deployment or measured business outcome is claimed. Repository: github.com/bazhinapolly/ai-gmail-classifier-apps-script", "small"),
+        p("Release v2.0.1 was verified locally on 2026-07-17: 31 tests passed with 96.97% statement and 94.07% branch coverage. Live Apps Script verification remains pending. No client deployment or measured business outcome is claimed. Repository: github.com/bazhinapolly/ai-gmail-classifier-apps-script", "small"),
         p("Deployment path", "h2"),
         p("Install with clasp or the Apps Script editor, add a restricted OpenAI project key in Script Properties, review the manifest scopes, run idempotent setup, execute the controlled smoke test, and validate with a dedicated Gmail account before enabling the five-minute trigger."),
         p("Business value", "h2"),
@@ -141,11 +141,11 @@ def build_technical():
         p("Safety controls", "h2"),
         Table([[[bullet("Untrusted email delimiters and prompt instructions"), bullet("Strict local schema and finite confidence"), bullet("No secret-bearing status output"), bullet("Explicit OAuth scope allowlist")], [bullet("Lock and runtime deadline"), bullet("Bounded retry and Retry-After support"), bullet("Formula-safe spreadsheet values"), bullet("Content-free operational logging")]]], colWidths=[3.35 * inch] * 2, style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), PALE), ("BOX", (0, 0), (-1, -1), 0.7, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 8)])),
         p("Verification", "h2"),
-        p("30 tests plus repository and evaluation-fixture checks run on Node.js 20, 22, and 24. Instrumented branch coverage is 94.03%. Live Apps Script verification is pending; the dedicated-account checklist has not been marked passed."),
+        p("31 tests plus repository and evaluation-fixture checks run on Node.js 20, 22, and 24. Instrumented branch coverage is 94.07%. Live Apps Script verification is pending; the dedicated-account checklist has not been marked passed."),
         p("Run locally", "h2"),
         Table([[p("npm ci<br/>npm run check", "code"), p("cp .clasp.json.example .clasp.json<br/>npm run clasp:login", "code"), p("npm run clasp:status<br/>npm run clasp:push", "code")]], colWidths=[2.1 * inch, 2.9 * inch, 1.7 * inch], style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), NAVY), ("BOX", (0, 0), (-1, -1), 0.7, NAVY), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("PADDING", (0, 0), (-1, -1), 8)])),
         Spacer(1, 0.05 * inch),
-        p("Verified locally 2026-07-17 | code commit 607039a9e53a051694e7348cdd33cc2419bb7773 | github.com/bazhinapolly/ai-gmail-classifier-apps-script<br/>Portfolio verification only; no client deployment or measured business outcome is claimed. Production rollout requires a dedicated Gmail smoke test.", "small"),
+        p("Verified locally 2026-07-17 | release v2.0.1 | 31 tests | github.com/bazhinapolly/ai-gmail-classifier-apps-script<br/>Portfolio verification only; no client deployment or measured business outcome is claimed. Production rollout requires a dedicated Gmail smoke test.", "small"),
     ]
     document(OUT / "AI-Gmail-Classifier-Technical-Summary.pdf", "AI Gmail Classifier - Technical Summary").build(story, onFirstPage=frame, onLaterPages=frame, canvasmaker=invariant_canvas)
 

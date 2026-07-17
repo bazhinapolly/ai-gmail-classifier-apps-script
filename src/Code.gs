@@ -404,6 +404,14 @@ function parseOpenAIResponse_(responseText) {
     );
   }
 
+  if (response.status !== "completed") {
+    throw createClassifierError_(
+      "unexpected_provider_status",
+      "OpenAI response did not reach completed status.",
+      { markForReview: true }
+    );
+  }
+
   const output = Array.isArray(response.output) ? response.output : [];
   let outputText = "";
 

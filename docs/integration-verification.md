@@ -4,7 +4,7 @@ This file is the evidence template for an owner-run smoke test on a dedicated Gm
 
 ## Current status
 
-- Locally verified code commit: `607039a9e53a051694e7348cdd33cc2419bb7773`
+- Locally verified release: `v2.0.1`
 - Local verification date: 2026-07-17
 - Test date: pending
 - Environment: dedicated test Gmail account
@@ -31,4 +31,4 @@ After execution, record the full commit SHA, UTC date, Apps Script runtime, conf
 
 ## Automated evidence already completed
 
-The code commit above passed 30 deterministic tests with 96.95% statements, 94.03% branches, 100% functions, and 96.89% lines on the instrumented `src/Code.gs`. These results verify local logic and Apps Script service stubs only. They do not change the pending status of the dedicated-account integration checklist.
+The release above passed 31 deterministic tests with 96.97% statements, 94.07% branches, 100% functions, and 96.91% lines on the instrumented `src/Code.gs`. These results verify local logic and Apps Script service stubs only. They do not change the pending status of the dedicated-account integration checklist.
