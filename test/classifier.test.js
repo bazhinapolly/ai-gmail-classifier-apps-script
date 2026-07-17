@@ -1,16 +1,38 @@
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
+const { mkdirSync, readFileSync, writeFileSync } = require("node:fs");
 const { join } = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 
+const coverageEnabled = process.env.CODE_COVERAGE === "1";
+const coverageStore = {};
+const instrumenter = coverageEnabled
+  ? require("istanbul-lib-instrument").createInstrumenter({ compact: false })
+  : null;
+
+if (coverageEnabled) {
+  process.on("exit", () => {
+    mkdirSync(join(__dirname, "../coverage"), { recursive: true });
+    writeFileSync(
+      join(__dirname, "../coverage/coverage-final.json"),
+      JSON.stringify(coverageStore),
+      "utf8"
+    );
+  });
+}
+
 function loadScript(overrides = {}) {
   const context = vm.createContext({
     console: { log() {}, error() {} },
+    __coverage__: coverageStore,
     ...overrides
   });
-  const source = readFileSync(join(__dirname, "../src/Code.gs"), "utf8");
-  vm.runInContext(source, context, { filename: "src/Code.gs" });
+  const sourcePath = join(__dirname, "../src/Code.gs");
+  const source = readFileSync(sourcePath, "utf8");
+  const executable = instrumenter
+    ? instrumenter.instrumentSync(source, sourcePath)
+    : source;
+  vm.runInContext(executable, context, { filename: "src/Code.gs" });
   return {
     call(expression) {
       return vm.runInContext(expression, context);
@@ -409,4 +431,167 @@ test("getErrorLogSheet_ replaces an inaccessible stored spreadsheet", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0][2], "error_log_recreated");
   assert.match(warnings[0], /creating a replacement/);
+});
+
+test("public trigger, status, retention, and fictional smoke helpers are bounded", () => {
+  const triggers = [
+    { getHandlerFunction: () => "classifyUnreadEmails", getUniqueId: () => "first" },
+    { getHandlerFunction: () => "classifyUnreadEmails", getUniqueId: () => "extra" },
+    { getHandlerFunction: () => "other", getUniqueId: () => "other" }
+  ];
+  const deleted = [];
+  const properties = { OPENAI_API_KEY: "key", ERROR_LOG_RETENTION_DAYS: "30" };
+  const sheet = { getLastRow: () => 1, getParent: () => ({ getUrl: () => "https://example.invalid" }) };
+  const script = loadScript({
+    sheet,
+    Gmail: { Users: {} },
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => properties[key] || null }) },
+    ScriptApp: {
+      getProjectTriggers: () => triggers,
+      deleteTrigger: (trigger) => deleted.push(trigger.getUniqueId())
+    }
+  });
+  script.call("getErrorLogSheet_=function(){return sheet;}");
+  script.call("classifyEmailWithOpenAI_=function(){return {categoryId:'invoice',confidence:0.99,reason:'Invoice'};}");
+  assert.equal(script.call("pruneErrorLog()"), 0);
+  assert.equal(script.call("createFiveMinuteTrigger().getUniqueId()"), "first");
+  assert.deepEqual(deleted, ["extra"]);
+  assert.equal(script.call("deleteClassifierTriggers()"), 2);
+  const status = script.call("getClassifierStatus()");
+  assert.equal(status.configured, true);
+  assert.equal(status.triggerCount, 2);
+  assert.equal(status.errorLogRetentionDays, 30);
+  const smoke = script.call("testClassifierWithSampleEmail()");
+  assert.equal(smoke.resolvedCategory, "invoice");
+});
+
+test("OpenAI adapter succeeds, retries transient failures, and fails closed", () => {
+  const valid = JSON.stringify({
+    status: "completed",
+    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ categoryId: "invoice", confidence: 0.9, reason: "Invoice" }) }] }]
+  });
+  const responses = [
+    { getResponseCode: () => 429, getAllHeaders: () => ({ "Retry-After": "0" }), getContentText: () => JSON.stringify({ error: { code: "rate_limit" } }) },
+    { getResponseCode: () => 200, getContentText: () => valid }
+  ];
+  let sleeps = 0;
+  const script = loadScript({
+    Utilities: { getUuid: () => "client-id", sleep: () => { sleeps += 1; } },
+    UrlFetchApp: { fetch: () => responses.shift() }
+  });
+  script.call("CONFIG.OPENAI_MAX_ATTEMPTS=2");
+  const result = script.call("classifyEmailWithOpenAI_({subject:'x',senderDomain:'example.com',bodySnippet:'y'},'key','model')");
+  assert.equal(result.categoryId, "invoice");
+  assert.equal(sleeps, 1);
+
+  const exhausted = loadScript({
+    Utilities: { getUuid: () => "client-id", sleep() {} },
+    UrlFetchApp: { fetch: () => ({ getResponseCode: () => 500, getAllHeaders: () => ({}), getContentText: () => "{}" }) }
+  });
+  exhausted.call("CONFIG.OPENAI_MAX_ATTEMPTS=2");
+  assert.throws(
+    () => exhausted.call("classifyEmailWithOpenAI_({subject:'x',senderDomain:'x',bodySnippet:'x'},'key','model')"),
+    (error) => error.retryable && error.fatal
+  );
+
+  const network = loadScript({
+    Utilities: { getUuid: () => "client-id", sleep() {} },
+    UrlFetchApp: { fetch: () => { throw new Error("private network detail"); } }
+  });
+  network.call("CONFIG.OPENAI_MAX_ATTEMPTS=2");
+  assert.throws(
+    () => network.call("classifyEmailWithOpenAI_({subject:'x',senderDomain:'x',bodySnippet:'x'},'key','model')"),
+    (error) => error.code === "network_error" && error.fatal
+  );
+});
+
+test("provider response parser rejects every incomplete output shape", () => {
+  const script = loadScript();
+  const cases = [
+    ["not-json", /invalid JSON/],
+    [JSON.stringify({ error: { code: "bad" } }), /error response/],
+    [JSON.stringify({ status: "incomplete", output: [] }), /incomplete/],
+    [JSON.stringify({ status: "completed", output: [] }), /did not include/],
+    [JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "bad-json" }] }] }), /not valid JSON/]
+  ];
+  for (const [value, expected] of cases) {
+    assert.throws(() => script.call(`parseOpenAIResponse_(${JSON.stringify(value)})`), expected);
+  }
+  for (const expression of [
+    "validateClassification_(null)",
+    "validateClassification_({categoryId:'missing',confidence:0.5,reason:'x'})",
+    "validateClassification_({categoryId:'invoice',confidence:0.5,reason:''})",
+    "validateClassification_({categoryId:'invoice',confidence:0.5,reason:'x'.repeat(501)})"
+  ]) {
+    assert.throws(() => script.call(expression));
+  }
+});
+
+test("review labeling and error logging remain safe when secondary services fail", () => {
+  const errors = [];
+  const rows = [];
+  let modifyCalls = 0;
+  const sheet = {
+    getLastRow: () => 1,
+    appendRow: (row) => rows.push(row)
+  };
+  const script = loadScript({
+    sheet,
+    console: { log() {}, warn() {}, error: (value) => errors.push(value) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) },
+    Gmail: { Users: { Messages: { modify() { modifyCalls += 1; if (modifyCalls > 1) throw new Error("label failed"); } } } }
+  });
+  script.call("getErrorLogSheet_=function(){return sheet;}");
+  script.call("addNeedsReviewLabelSafely_('one',{byName:{'AI/Needs Review':{id:'review'}}},new Error('original'))");
+  script.call("addNeedsReviewLabelSafely_('two',{byName:{'AI/Needs Review':{id:'review'}}},new Error('original'))");
+  script.call("logErrorSafely_('message',{code:'safe_code',message:'safe message',httpStatus:500,requestId:'req',clientRequestId:'client',attempt:2})");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0][2], "safe_code");
+  assert.match(errors[0], /Unable to apply/);
+  script.call("getErrorLogSheet_=function(){throw new Error('sheet failed');}");
+  script.call("logErrorSafely_('',null)");
+  assert.match(errors[1], /Sheets logging also failed/);
+});
+
+test("configuration validation covers category, service, key, and retention invariants", () => {
+  const mutations = [
+    ["", /Advanced Gmail/],
+    ["CONFIG.MAX_MESSAGES_PER_RUN=0", /MAX_MESSAGES_PER_RUN/],
+    ["CONFIG.CONFIDENCE_THRESHOLD=2", /CONFIDENCE_THRESHOLD/],
+    ["CONFIG.CATEGORIES[0].id='Bad ID'", /category id/],
+    ["CONFIG.CATEGORIES[0].label='Invoice'", /managed label/],
+    ["CONFIG.CATEGORIES[1].id=CONFIG.CATEGORIES[0].id", /unique/],
+    ["CONFIG.CATEGORIES=CONFIG.CATEGORIES.filter(function(x){return x.id!=='other';})", /Exactly one/]
+  ];
+  for (const [mutation, expected] of mutations) {
+    const withGmail = mutation !== "";
+    const script = loadScript({
+      ...(withGmail ? { Gmail: { Users: {} } } : {}),
+      PropertiesService: { getScriptProperties: () => ({ getProperty: () => null }) }
+    });
+    if (mutation) script.call(mutation);
+    assert.throws(() => script.call("validateConfig_(false)"), expected);
+  }
+  const retention = loadScript({ PropertiesService: { getScriptProperties: () => ({ getProperty: () => "invalid" }) } });
+  assert.throws(() => retention.call("getErrorLogRetentionDays_()"), /integer/);
+  const key = loadScript({ PropertiesService: { getScriptProperties: () => ({ getProperty: () => " " }) } });
+  assert.throws(() => key.call("getOpenAIKey_()"), /Missing/);
+});
+
+test("small data helpers cover absent values and case-insensitive headers", () => {
+  const script = loadScript({
+    Gmail: { Users: { Messages: { list: () => ({}) } } },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (key) => key === "OPENAI_MODEL" ? " custom-model " : null }) }
+  });
+  assert.deepEqual(Array.from(script.call("listPendingMessages_()")), []);
+  assert.equal(script.call("buildEmailInput_({}).senderDomain"), "unknown");
+  assert.equal(script.call("getConfiguredModel_()"), "custom-model");
+  assert.equal(script.call("getHeaderCaseInsensitive_({'X-Request-ID':['first','second']},'x-request-id')"), "first");
+  assert.equal(script.call("getHeaderCaseInsensitive_(null,'missing')"), "");
+  assert.equal(script.call("parseJsonSafely_('bad')"), null);
+  assert.equal(script.call("getErrorCode_(null)"), "runtime_error");
+  assert.equal(script.call("safeErrorMessage_(null)"), "Unknown error");
+  assert.equal(script.call("escapeSpreadsheetText_(null)"), "");
+  assert.equal(script.call("hasLabelId_({},'missing')"), false);
 });
