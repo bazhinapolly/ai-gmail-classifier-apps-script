@@ -22,7 +22,7 @@ that thread was already processed.
 - Sends permanent per-message failures to `AI/Needs Review`
 - Writes metadata-only, formula-safe error records to Google Sheets
 - Automatically removes error records after a configurable retention period
-- Includes deterministic local tests and GitHub Actions CI
+- Includes 30 deterministic tests, measured coverage gates, and GitHub Actions CI
 
 ## Data flow
 
@@ -162,6 +162,8 @@ allowlist, the synthetic evaluation dataset, repository hygiene, unit tests,
 and end-to-end orchestration behavior with Apps Script service stubs. CI runs
 the same command on Node.js 20, 22, and 24.
 
+The instrumented Apps Script source is required to maintain at least 90% statements, 85% branches, 90% functions, and 90% lines. The verified code commit `607039a9e53a051694e7348cdd33cc2419bb7773` reached 96.95% statements, 94.03% branches, 100% functions, and 96.89% lines on 2026-07-17.
+
 The versioned evaluation harness covers all categories and prompt-injection
 cases and can produce confusion-matrix, precision, and recall metrics for an
 explicit model. See [classification evaluation](docs/evaluation.md). No live
@@ -172,6 +174,8 @@ For a real integration test, use a dedicated Gmail test account and follow the
 Record the owner-run evidence in [integration verification](docs/integration-verification.md)
 without including message content, account identifiers, secrets, or claims of
 client deployment.
+
+Live Apps Script verification remains pending until the dedicated-account checklist is executed. The repository and portfolio documents do not claim a client deployment or measured business outcome.
 
 ## Portfolio documents
 
